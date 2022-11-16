@@ -14,17 +14,16 @@
 #include <sys/resource.h>
 
 
-
-
 /**
- * @brief 
+ * @brief            it destroys those dynamically allocated memory for the task.
  * 
- * @param task 
+ * @param task       a task object.
  */
 static void free_task(Task *task){
    free(task->file_name);
    free(task);
 }
+
 
 
 /**
@@ -34,8 +33,7 @@ static void free_task(Task *task){
  */
 static void destroy_thread_pool(ThreadPool *pool){
    pthread_mutex_destroy(&pool->q->lock);
-   pthread_cond_destroy(&pool->cond_var);
-   pthread_cond_destroy(&pool->q->Queue_signal);
+   pthread_cond_destroy(&pool->q->cond_var);
    free(pool->q);
    free(pool->flags);
    free(pool->threads_array);
@@ -93,15 +91,14 @@ ThreadPool* creates_thread_pool(int number_threads, char* path_name){
    pool->number_threads= number_threads;
    pool->threads_array = safe_malloc(sizeof(pthread_t) * number_threads, pool);
    pool->block_size = 0;
-   //pool->working_threads = 0;
-   //TODO: create queue func and move safe malloc to queue.h
-
    pool->flags = safe_malloc(sizeof(Flags) *1, pool);
    pool->flags->read_permission = true;
    pool->q = create_Queue(path_name);
 
-   pthread_cond_init(&pool->cond_var,NULL);
-   pthread_cond_init(&pool->q->Queue_signal, NULL);
+   if(pthread_cond_init(&pool->q->cond_var,NULL) != 0){
+      perror("pthread_cond_init failed");
+      exit(EXIT_FAILURE);
+   }
 
    if(pthread_mutex_init(&pool->q->lock, NULL) != 0){
       perror("pthread_mutex failed\n");
@@ -146,9 +143,8 @@ static void executing_task_function (Task* task, ThreadPool* pool){
    lstat(task->file_name,&buffer);
 
    if(!check_if_directory(&buffer) && check_if_read_permissions(task->file_name)){
-      // refactor that piece of code. 
-      counting_size(&buffer,&pool->block_size);
       pthread_mutex_lock(&pool->q->lock);
+      counting_size(&buffer,&pool->block_size);
       pool->q->tasks_pending--;
       pthread_mutex_unlock(&pool->q->lock);
       free_task(task);
@@ -180,10 +176,7 @@ static void executing_task_function (Task* task, ThreadPool* pool){
             if (strcmp(dir_read->d_name, "..") != 0 && strcmp(dir_read->d_name, ".") != 0) {
                if(check_if_read_permissions(full_path)){
                   // those lock can be held in the enqueue_task_into_queue function.
-                  pthread_mutex_lock(&pool->q->lock);
                   enqueue_task_into_queue(pool->q,full_path);
-                  pthread_cond_signal(&pool->cond_var);
-                  pthread_mutex_unlock(&pool->q->lock);
                }
                else{
                   pthread_mutex_lock(&pool->q->lock);
@@ -198,17 +191,17 @@ static void executing_task_function (Task* task, ThreadPool* pool){
          else {
             counting_size(&buff,&temp_size);
          }
-
       }
+
       // synchronization of file size
       pthread_mutex_lock(&pool->q->lock);
       pool->block_size = pool->block_size + temp_size;
       pool->q->tasks_pending--;
-      pthread_cond_broadcast(&pool->cond_var);
+      pthread_cond_broadcast(&pool->q->cond_var);
       pthread_mutex_unlock(&pool->q->lock);
+      
       closedir(dir);
       free_task(task);
-
       return;
    }
 
@@ -231,7 +224,7 @@ void* thread_function (void* p){
          }
          // otherwise, let the threads to wait..aka sleep.
          else{
-            pthread_cond_wait(&pool->cond_var, &pool->q->lock);
+            pthread_cond_wait(&pool->q->cond_var, &pool->q->lock);
          }
       }
       // we can assume that there is work to do, so increment the current_working_thread var.

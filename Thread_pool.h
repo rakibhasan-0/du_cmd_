@@ -15,7 +15,6 @@ typedef struct Flags{
 typedef struct ThreadPool{
    unsigned int block_size;
    Queue* q;
-   pthread_cond_t cond_var; 
    pthread_t* threads_array; 
    int number_threads; 
    char* first_file; 

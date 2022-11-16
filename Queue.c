@@ -26,7 +26,7 @@ Queue* create_Queue(const char* path){
 
 void enqueue_task_into_queue (Queue* queue, char* file_name){
 
-   //pthread_mutex_lock(&queue->lock);
+   pthread_mutex_lock(&queue->lock);
    // if first element.
    Task* task = create_task(strdup(file_name));
 
@@ -40,8 +40,8 @@ void enqueue_task_into_queue (Queue* queue, char* file_name){
       queue->tail->next_task = task; 
       queue->tail = task; 
    }
-   //pthread_cond_signal(&queue->Queue_signal);
-   //pthread_mutex_unlock(&queue->lock); 
+   pthread_cond_signal(&queue->cond_var);
+   pthread_mutex_unlock(&queue->lock); 
 
 } 
 

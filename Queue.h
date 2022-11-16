@@ -20,8 +20,8 @@ typedef struct Queue{
    Task* head; 
    Task* tail; 
    int tasks_pending;
+   pthread_cond_t cond_var; 
    pthread_mutex_t Queue_lock; 
-   pthread_cond_t Queue_signal; 
 }Queue; 
 
 
@@ -81,10 +81,10 @@ Task* create_task(char* path_name);
 
 
 /**
- * @brief Create a Queue object
+ * @brief                     It creates a queue.
  * 
- * @param path 
- * @return Queue* 
+ * @param path                The file or directory name.
+ * @return                    It will create a queue data structure successfully in return.
  */
 Queue* create_Queue(const char* path);
 
