@@ -16,14 +16,27 @@ typedef struct Task{
 
 // the type of queue.
 typedef struct Queue{
-   pthread_mutex_t lock; 
-   Task* task_content; 
+   pthread_mutex_t lock;  
    Task* head; 
    Task* tail; 
    int tasks_pending;
    pthread_mutex_t Queue_lock; 
    pthread_cond_t Queue_signal; 
 }Queue; 
+
+
+
+/**
+ * @brief            it checks whether malloc can can allocated successfully or not.
+ *
+ * @param size       The given size to be allocated
+ * @param ptr        a void pointer.
+ * @return           if we can successfully allocated the memory then it will return the allocated memory a pointer t
+ *                   points to that memory.
+ */
+
+void* safe_malloc(size_t size, void* ptr);
+
 
 /**
  * @brief                     Enqueue a task into the queue.
@@ -64,5 +77,16 @@ bool check_if_queue_is_empty(Queue* queue);
  * @return                    It will create a task successfully in return.
  */
 Task* create_task(char* path_name);
+
+
+
+/**
+ * @brief Create a Queue object
+ * 
+ * @param path 
+ * @return Queue* 
+ */
+Queue* create_Queue(const char* path);
+
 
 #endif

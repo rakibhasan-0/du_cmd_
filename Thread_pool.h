@@ -24,11 +24,14 @@ typedef struct ThreadPool{
    Flags* flags;
 }ThreadPool; 
 
+
+
+
 /**
  * @brief                  The thread function while creating threads we will pass that function
  *                         as the argument.
  * 
- * @param p threadpool      It will be the threadpool which will be passed as the argument.
+ * @param p thread pool      It will be the thread pool which will be passed as the argument.
  */
 void* thread_function (void* p);
 
