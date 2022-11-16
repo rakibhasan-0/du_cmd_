@@ -11,6 +11,18 @@
 #include <linux/limits.h>
 #include "Thread_pool.h"
 
+
+/**
+ * @brief   In that program we will determine the size of the directory or a file with threads or without threads.
+ *          It was equivelent to the du -l -s -B512 file/dir cmd line in the terminal. 
+ * 
+ * 
+ * 
+ * @author  Gazi Md Rakibul Hasan.[ens20ghn]
+ * @date    2022-11-16
+ */
+
+
 /**
  * @brief                  That function counts the size of directory.
  * 

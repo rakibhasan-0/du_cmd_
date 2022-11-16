@@ -127,7 +127,95 @@ static void counting_size (struct stat* buffer,unsigned int* temp_size){
 }
 
 
+/**
+ * @brief                     In that function we will handle the error cases when we try to read a directory
+* and                         which is not allowed read.
+ * 
+ * @param buff                The structure of the stat.
+ * @param full_path           The directory name.
+ * @param pool                The thread pool structure.
+ */
+static void permission_denied (struct stat buff, char* full_path, ThreadPool* pool){
+   pthread_mutex_lock(&pool->q->lock);
+   counting_size(&buff,&pool->block_size);
+   pool->flags->read_permission = false;
+   pthread_mutex_unlock(&pool->q->lock);
+   fprintf(stderr, "du: cannot read directory '%s': Permission denied\n",full_path);
+   return;   
+}
 
+
+/**
+ * @brief                  In that function we will synchronized the directory's size.
+ * 
+ * @param temp_size        The task. 
+ * @param pool             The thread pool structure.
+ */
+static void synchronization_of_dir_size(unsigned int* temp_size, ThreadPool* pool){
+
+   pthread_mutex_lock(&pool->q->lock);
+   pool->block_size = pool->block_size + *temp_size;
+   pool->q->tasks_pending--;
+   pthread_cond_broadcast(&pool->q->cond_var);
+   pthread_mutex_unlock(&pool->q->lock);
+   return;
+}
+
+
+/**
+ * @brief                  In that function a directory will be traversed by threads. Meanwhile, the 
+ *                         size of the directory will get synchronized.
+ * 
+ * @param buffer           The stat structure. 
+ * @param task             The task to. 
+ * @param pool             The thread pool structure.
+ */
+static void traversing_of_directory(struct stat buffer, Task* task, ThreadPool* pool){
+
+   struct dirent* dir_read;
+   struct stat buff;
+   unsigned int temp_size = 0;
+
+   DIR* dir = opendir(task->file_name);
+   if(dir == NULL){
+      perror("something went wrong\n");
+      exit(EXIT_FAILURE);
+   }
+
+   counting_size(&buffer,&temp_size);
+   
+   // traversing of the directory.
+   while((dir_read = readdir(dir)) != NULL){
+      //getting full path 
+      char full_path[PATH_MAX +1 ] = {0};
+      snprintf(full_path,sizeof(full_path)-1, "%s/%s",task->file_name,dir_read->d_name);
+      lstat(full_path, &buff);
+
+      if(check_if_directory(&buff)){
+         if (strcmp(dir_read->d_name, "..") != 0 && strcmp(dir_read->d_name, ".") != 0) {
+            if(check_if_read_permissions(full_path)){
+               // those lock can be held in the enqueue_task_into_queue function.
+               enqueue_task_into_queue(pool->q,full_path);
+            }
+            else{
+               permission_denied(buff,full_path, pool);               
+            }
+         }
+      }
+
+      else {
+         counting_size(&buff,&temp_size);
+      }
+   }
+
+   // synchronization of file size
+   synchronization_of_dir_size(&temp_size, pool);
+  
+   closedir(dir);
+
+   return;
+
+}
 
 /**
  * @brief                        it will execute each task which will execute the specified task which will be
@@ -152,55 +240,7 @@ static void executing_task_function (Task* task, ThreadPool* pool){
    }
 
    else if(check_if_directory(&buffer) && check_if_read_permissions(task->file_name)){
-      
-      struct dirent* dir_read;
-      DIR* dir = opendir(task->file_name);
-
-      if(dir == NULL){
-         perror("something went wrong\n");
-         exit(EXIT_FAILURE);
-      }
-
-      unsigned int temp_size = 0;
-      counting_size(&buffer,&temp_size);
-      
-      // traversing of the directory.
-      struct stat buff;
-      while((dir_read = readdir(dir)) != NULL){
-         //getting full path 
-         char full_path[PATH_MAX +1 ] = {0};
-         snprintf(full_path,sizeof(full_path)-1, "%s/%s",task->file_name,dir_read->d_name);
-         lstat(full_path, &buff);
-
-         if(check_if_directory(&buff)){
-            if (strcmp(dir_read->d_name, "..") != 0 && strcmp(dir_read->d_name, ".") != 0) {
-               if(check_if_read_permissions(full_path)){
-                  // those lock can be held in the enqueue_task_into_queue function.
-                  enqueue_task_into_queue(pool->q,full_path);
-               }
-               else{
-                  pthread_mutex_lock(&pool->q->lock);
-                  counting_size(&buff,&pool->block_size);
-                  pool->flags->read_permission = false;
-                  pthread_mutex_unlock(&pool->q->lock);
-                  fprintf(stderr, "du: cannot read directory '%s': Permission denied\n",full_path);                  
-               }
-            }
-         }
-
-         else {
-            counting_size(&buff,&temp_size);
-         }
-      }
-
-      // synchronization of file size
-      pthread_mutex_lock(&pool->q->lock);
-      pool->block_size = pool->block_size + temp_size;
-      pool->q->tasks_pending--;
-      pthread_cond_broadcast(&pool->q->cond_var);
-      pthread_mutex_unlock(&pool->q->lock);
-      
-      closedir(dir);
+      traversing_of_directory(buffer, task, pool);
       free_task(task);
       return;
    }
