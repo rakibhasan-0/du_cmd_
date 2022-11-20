@@ -19,8 +19,10 @@
  * 
  * 
  * @author  Gazi Md Rakibul Hasan.[ens20ghn]
- * @date    2022-11-16
+ * @date    2022-11-19
  */
+
+
 
 
 /**
@@ -49,14 +51,8 @@ void count_directory_and_file_size_without_thread(int argc, char** argv, Flags* 
 
 int main(int argc, char** argv){
 
-   int opt; 
-   int number_threads; 
+   int opt, number_threads; 
    bool threads_given = false;
-   //Flags* flags = (Flags*) malloc(sizeof(Flags));
-
-   //flags->threads_given = false;
-   //flags->first_time = true;
-   //flags->read_permission = true;
  
    while ((opt = getopt(argc, argv, "j:")) != -1){
       switch(opt){
@@ -72,17 +68,15 @@ int main(int argc, char** argv){
    
    if(!threads_given){
       //count_directory_and_file_size_without_thread(argc, argv, flags);
-        for(int i = optind; i < argc; i++){
-         count_dir_size_by_threads (argv[i],1); 
+      for(int i = optind; i < argc; i++){
+         count_dir_size_by_threads(argv[i],1); 
       }
    }
    else{
       for(int i = optind; i < argc; i++){
-         count_dir_size_by_threads (argv[i],number_threads); 
+         count_dir_size_by_threads(argv[i],number_threads); 
       }
    }
-
-   //free(flags);
    return 0; 
 }
 

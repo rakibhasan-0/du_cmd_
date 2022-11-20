@@ -1,4 +1,5 @@
-TIMEFORMAT = %R
+#!/bin/bash
+TIMEFORMAT=%R
 
 for n in {1..100};
 do

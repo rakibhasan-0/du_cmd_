@@ -21,7 +21,7 @@ typedef struct Queue{
    Task* tail; 
    int tasks_pending;
    pthread_cond_t cond_var; 
-   pthread_mutex_t Queue_lock; 
+   //pthread_mutex_t Queue_lock; 
 }Queue; 
 
 

@@ -19,7 +19,7 @@
  * 
  * @param task       a task object.
  */
-static void free_task(Task *task){
+static void destroy_task(Task *task){
    free(task->file_name);
    free(task);
 }
@@ -91,7 +91,7 @@ ThreadPool* creates_thread_pool(int number_threads, char* path_name){
    pool->number_threads= number_threads;
    pool->threads_array = safe_malloc(sizeof(pthread_t) * number_threads, pool);
    pool->block_size = 0;
-   pool->flags = safe_malloc(sizeof(Flags) *1, pool);
+   pool->flags = safe_malloc(sizeof(Flags) *1, pool->flags);
    pool->flags->read_permission = true;
    pool->q = create_Queue(path_name);
 
@@ -136,11 +136,13 @@ static void counting_size (struct stat* buffer,unsigned int* temp_size){
  * @param pool                The thread pool structure.
  */
 static void permission_denied (struct stat buff, char* full_path, ThreadPool* pool){
+
    pthread_mutex_lock(&pool->q->lock);
    counting_size(&buff,&pool->block_size);
    pool->flags->read_permission = false;
-   pthread_mutex_unlock(&pool->q->lock);
    fprintf(stderr, "du: cannot read directory '%s': Permission denied\n",full_path);
+   pthread_mutex_unlock(&pool->q->lock);
+
    return;   
 }
 
@@ -158,7 +160,9 @@ static void synchronization_of_dir_size(unsigned int* temp_size, ThreadPool* poo
    pool->q->tasks_pending--;
    pthread_cond_broadcast(&pool->q->cond_var);
    pthread_mutex_unlock(&pool->q->lock);
+
    return;
+
 }
 
 
@@ -189,12 +193,14 @@ static void traversing_of_directory(struct stat buffer, Task* task, ThreadPool* 
       //getting full path 
       char full_path[PATH_MAX +1 ] = {0};
       snprintf(full_path,sizeof(full_path)-1, "%s/%s",task->file_name,dir_read->d_name);
-      lstat(full_path, &buff);
+      if(lstat(full_path, &buff) != 0){
+         perror("stat failed\n");
+         exit(EXIT_FAILURE);
+      }
 
       if(check_if_directory(&buff)){
          if (strcmp(dir_read->d_name, "..") != 0 && strcmp(dir_read->d_name, ".") != 0) {
             if(check_if_read_permissions(full_path)){
-               // those lock can be held in the enqueue_task_into_queue function.
                enqueue_task_into_queue(pool->q,full_path);
             }
             else{
@@ -207,15 +213,14 @@ static void traversing_of_directory(struct stat buffer, Task* task, ThreadPool* 
          counting_size(&buff,&temp_size);
       }
    }
-
-   // synchronization of file size
+   // synchronization of dir size
    synchronization_of_dir_size(&temp_size, pool);
-  
    closedir(dir);
 
    return;
 
 }
+
 
 /**
  * @brief                        it will execute each task which will execute the specified task which will be
@@ -224,29 +229,31 @@ static void traversing_of_directory(struct stat buffer, Task* task, ThreadPool* 
  * @param task                   The task to execute.
  * @param pool                   The thread pool.
  */
-static void executing_task_function (Task* task, ThreadPool* pool){
+static void execution_of_task (Task* task, ThreadPool* pool){
+
+   struct stat buffer;
+   if(lstat(task->file_name,&buffer) != 0){
+      perror(" stat failed");
+      exit(EXIT_FAILURE);
+   }
 
    // in case first element is the a file.
-   struct stat buffer;
-   lstat(task->file_name,&buffer);
-
    if(!check_if_directory(&buffer) && check_if_read_permissions(task->file_name)){
       pthread_mutex_lock(&pool->q->lock);
       counting_size(&buffer,&pool->block_size);
       pool->q->tasks_pending--;
       pthread_mutex_unlock(&pool->q->lock);
-      free_task(task);
+      destroy_task(task);
       return;
    }
-
+   // now we can assume that it is a directory.
    else if(check_if_directory(&buffer) && check_if_read_permissions(task->file_name)){
       traversing_of_directory(buffer, task, pool);
-      free_task(task);
+      destroy_task(task);
       return;
    }
 
 }
-
 
 
 void* thread_function (void* p){
@@ -257,7 +264,7 @@ void* thread_function (void* p){
      // to ensure that nothing can manipulate the pool's member.
       pthread_mutex_lock(&pool->q->lock);
       while(check_if_queue_is_empty(pool->q)){
-         // that means there is no task to to do.
+         // that means there is no task to do and the function will return NULL.
          if(pool->q->tasks_pending == 0){
             pthread_mutex_unlock(&pool->q->lock);
             return NULL;
@@ -267,12 +274,11 @@ void* thread_function (void* p){
             pthread_cond_wait(&pool->q->cond_var, &pool->q->lock);
          }
       }
-      // we can assume that there is work to do, so increment the current_working_thread var.
-      // get the task from the queue.
+      // get a task from the queue.
       Task* task = dequeue_task_from_queue(pool->q);
-      // let other threads to work so we choose to the it unlock.
+      // now we can release the mutex so that an another thread enter into the critical section.
       pthread_mutex_unlock(&pool->q->lock);  
-      executing_task_function(task, pool);
+      execution_of_task(task, pool);
    }
 
    return NULL;

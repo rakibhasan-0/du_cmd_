@@ -62,7 +62,7 @@ ThreadPool* creates_thread_pool(int number_threads, char* path_name);
 /**
  * @brief                     It will check if the given argument is file or not.
  * 
- * @param arg                 The argument.
+ * @param buffer              The struct stat.
  * @return                    It will return true if the argument is file otherwise false.
  */
 bool check_if_arg_is_file(struct stat* buffer);
@@ -71,7 +71,7 @@ bool check_if_arg_is_file(struct stat* buffer);
 /**
  * @brief                  It will check if the given argument is directory or not.
  * 
- * @param arg              The argument.
+ * @param st               The struct stat.
  * @return                 It will return true if the argument is directory otherwise false.
  */
 bool check_if_directory(struct stat* st);
@@ -90,7 +90,7 @@ bool check_if_read_permissions(const char* path_name);
 /**
  * @brief                  It will check if the given argument contains the symbolic link or not.
  * 
- * @param path_name        The argument.
+ * @param buffer           The struct stat.
  * @return                 It will return true if the argument contains the symbolic link otherwise false.
  */
 bool check_symbolic_link(struct stat* buffer);

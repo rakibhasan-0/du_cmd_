@@ -2,12 +2,12 @@
 
 
 void* safe_malloc(size_t size, void* ptr){
-	ptr = malloc(size);
-	if(ptr == NULL){
-		perror("something failed with malloc");
-		exit(EXIT_FAILURE);
-	}
-	return ptr;
+   ptr = malloc(size);
+   if(ptr == NULL){
+      perror("something failed with malloc");
+      exit(EXIT_FAILURE);
+   }
+   return ptr;
 }
 
 
@@ -36,7 +36,7 @@ void enqueue_task_into_queue (Queue* queue, char* file_name){
    }
    // for other cases..
    else{
-      //task->prev_task = queue->tail; 
+
       queue->tail->next_task = task; 
       queue->tail = task; 
    }
